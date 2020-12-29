@@ -39,7 +39,6 @@ ALLOWED_HOSTS = []
 
 
 # Application definition
-
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -48,7 +47,10 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "graphene_django",
-    "users",
+    "polymorphic",
+    "easy_thumbnails",
+    "users.apps.UsersConfig",
+    "trips.apps.TripsConfig",
 ]
 
 MIDDLEWARE = [
@@ -117,9 +119,12 @@ USE_L10N = True
 USE_TZ = True
 
 
+MEDIA_ROOT = BASE_DIR.joinpath("media")
+MEDIA_URL = "/media/"
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
-
+STATIC_ROOT = MEDIA_ROOT.joinpath("static")
 STATIC_URL = "/static/"
 
 AUTH_USER_MODEL = "users.User"
@@ -128,6 +133,10 @@ AUTHENTICATION_BACKENDS = [
     "graphql_jwt.backends.JSONWebTokenBackend",
     "django.contrib.auth.backends.ModelBackend",
 ]
+
+THUMBNAIL_ALIASES = {
+    "trips.Trip.cover_image": {"preview": {"size": (640, 480), "crop": "smart", "autocrop": True},},
+}
 
 GRAPHENE = {"SCHEMA": "fmt.schema.schema", "MIDDLEWARE": ["graphql_jwt.middleware.JSONWebTokenMiddleware"]}
 

@@ -6,24 +6,36 @@ from graphql_jwt.decorators import login_required
 from .models import User
 
 
-class UserType(DjangoObjectType):
+class UserPublicType(DjangoObjectType):
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "name",
+            "last_login",
+            "date_joined",
+        )
+
+
+class UserPrivateType(DjangoObjectType):
     class Meta:
         model = User
         fields = (
             "id",
             "email",
+            "name",
             "last_login",
             "date_joined",
         )
 
 
 class Query(object):
-    user = Field(UserType, id=Int())
-    me = Field(UserType)
+    user = Field(UserPublicType, id=Int(required=True))
+    me = Field(UserPrivateType)
 
     @staticmethod
     def resolve_user(self, info, **kwargs):
-        return User.objects.get_by_id(**kwargs)
+        return User.objects.get(**kwargs)
 
     @staticmethod
     @login_required

@@ -6,13 +6,6 @@ from .managers import UserManager
 
 
 class User(AbstractBaseUser, PermissionsMixin):
-    """
-    Custom user model.
-    Set username field to 'email'.
-    Set required fields 'first_name'.
-    Overwrite objects with our custom user manager.
-    """
-
     email = models.EmailField(unique=True)
     name = models.CharField(max_length=255)
     date_joined = models.DateTimeField(default=timezone.now)

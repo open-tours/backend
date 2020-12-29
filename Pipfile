@@ -11,6 +11,12 @@ django-graphql-jwt = "*"
 pyjwt = ">=1.5.0,<2"
 django-environ = "*"
 psycopg2-binary = "*"
+django-model-utils = "*"
+django-polymorphic = "*"
+pillow = "*"
+easy-thumbnails = "*"
+gpxpy = "*"
+lxml = "*"
 
 [requires]
 python_version = "3"
