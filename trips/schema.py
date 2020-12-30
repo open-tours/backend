@@ -1,17 +1,19 @@
 import math
 
 import gpxpy
+from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from gpxpy.gpx import GPXXMLSyntaxException
-from graphene import Field, Float, Int, List, Mutation, ObjectType, String
+from graphene import Argument, Date, Field, Float, InputObjectType, Int, List, Mutation, ObjectType, String
 from graphene_django.types import DjangoObjectType
 from graphene_file_upload.scalars import Upload
 from graphql import GraphQLError
 from graphql_jwt.decorators import login_required
 
 from users.schema import UserPublicType
+from utils.graphene import field_name_to_readable
 
-from .models import CyclingTrip
+from .models import CyclingStage, CyclingTrip
 
 
 class TripType(DjangoObjectType):
@@ -40,10 +42,15 @@ class HoursMinutesType(ObjectType):
     minutes = Int()
 
 
-class GPXFileInfoUpload(Mutation):
+class HoursMinutesArgument(InputObjectType):
+    hours = Int()
+    minutes = Int()
+
+
+class StageTypeMixin:
     name = String()
-    start_date = String()
-    end_date = String()
+    start_date = Date()
+    end_date = Date()
     distance_km = Float()
     moving_time = Field(HoursMinutesType)
     stopped_time = Field(HoursMinutesType)
@@ -52,12 +59,67 @@ class GPXFileInfoUpload(Mutation):
     uphill_m = Float()
     downhill_m = Float()
 
+
+class CreateStage(StageTypeMixin, Mutation):
+    class Arguments:
+        name = String(required=True)
+        trip_id = Int(required=True)
+        start_date = Date(required=True)
+        end_date = Date(required=True)
+        distance_km = Float()
+        moving_time = Argument(HoursMinutesArgument)
+        stopped_time = Argument(HoursMinutesArgument)
+        max_speed_km_per_h = Float()
+        avg_speed_km_per_h = Float()
+        uphill_m = Float()
+        downhill_m = Float()
+
+    @staticmethod
+    @login_required
+    def mutate(self, info, **fields):
+        print(fields)
+
+        # validate moving_time and stopped_time
+        for field in ["moving_time", "stopped_time"]:
+            if field not in fields:
+                continue
+
+            # validate
+            if "minutes" in fields[field]:
+                if not fields[field].get("hours"):
+                    raise GraphQLError(
+                        _(f"Minutes without Hours does not makes sense for {field_name_to_readable(field)}")
+                    )
+                if fields[field]["minutes"] < 0 or fields[field]["minutes"] > 59:
+                    raise GraphQLError(_(f"Minutes not in range 0-59 for {field_name_to_readable(field)}"))
+
+            if fields[field]["hours"] < 0:
+                raise GraphQLError(_(f"Hours can not be negative for {field_name_to_readable(field)}"))
+
+            # to seconds
+            fields[f"{field}_s"] = fields[field]["hours"] * 3600 + fields[field]["minutes"] * 60
+            del fields[field]
+
+        # force positive int/float values
+        for field, value in fields.items():
+            if not isinstance(value, (float, int)):
+                continue
+            value = float(value)
+            if value < 0:
+                raise GraphQLError(_(f"Value can not be negative for {field_name_to_readable(field)}"))
+
+        get_object_or_404(CyclingTrip, pk=fields.get("trip_id"), owner=info.context.user)
+        CyclingStage.objects.create(**fields)
+
+
+class GPXFileInfoUpload(StageTypeMixin, Mutation):
     class Arguments:
         file = Upload(required=True)
 
+    @staticmethod
     @login_required
-    def mutate(self, info, **kwargs):
-        gpx_file = kwargs["file"]
+    def mutate(self, info, **fields):
+        gpx_file = fields["file"]
         try:
             gpx = gpxpy.parse(gpx_file.file.read())
 
@@ -127,7 +189,6 @@ class Query:
     def resolve_trip(self, info, **kwargs):
         return CyclingTrip.objects.get(**kwargs)
 
-    @staticmethod
     @login_required
     def resolve_my_trips(self, info):
         return CyclingTrip.objects.filter(owner=info.context.user)
@@ -135,3 +196,4 @@ class Query:
 
 class Mutation(ObjectType):
     gpx_file_info = GPXFileInfoUpload.Field()
+    stageCreate = CreateStage().Field()

@@ -52,6 +52,7 @@ class CyclingTrip(Trip):
 
 class Stage(PolymorphicModel, TimeStampedModel):
     trip = models.ForeignKey(Trip, blank=False, null=False, on_delete=models.PROTECT,)
+    name = models.CharField(max_length=1024, blank=False, null=False)
     gpx_file = models.FileField(upload_to=upload_to, blank=True, null=True)
     start_date = models.DateField(blank=False, null=False)
     end_date = models.DateField(blank=False, null=False)
@@ -62,6 +63,9 @@ class Stage(PolymorphicModel, TimeStampedModel):
     downhill_m = models.DecimalField(max_digits=10, decimal_places=1, blank=True, null=True)
     max_speed_km_per_h = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     avg_speed_km_per_h = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+
+    class Meta:
+        ordering = ["start_date"]
 
 
 class CyclingStage(Stage):

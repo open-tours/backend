@@ -1,8 +1,10 @@
 import graphql_jwt
 from graphene import ID, Field, Int, Mutation, ObjectType, String
 from graphene_django.types import DjangoObjectType
+from graphql import GraphQLError
 from graphql_jwt.decorators import login_required
 
+from .forms import EmailUserCreationForm
 from .models import User
 
 
@@ -54,9 +56,12 @@ class CreateUser(Mutation):
         name = String(required=True)
 
     @staticmethod
-    def mutate(cls, info, email, password, name):
-        user = User.objects.create_user(email=email, password=password, name=name)
-        return CreateUser(id=user.id, email=user.email, name=name)
+    def mutate(self, info, **kwargs):
+        kwargs["password1"] = kwargs["password2"] = kwargs["password"]
+        form = EmailUserCreationForm(data=kwargs)
+        if not form.is_valid():
+            raise GraphQLError(list(dict(form.errors).values())[0][0])
+        form.save()
 
 
 class Mutation(ObjectType):
