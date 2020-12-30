@@ -17,6 +17,7 @@ pillow = "*"
 easy-thumbnails = "*"
 gpxpy = "*"
 lxml = "*"
+graphene-file-upload = "*"
 
 [requires]
 python_version = "3"

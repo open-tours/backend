@@ -36,7 +36,7 @@ class Trip(PolymorphicModel, TimeStampedModel):
         return request.build_absolute_uri(image_url_path)
 
 
-class CycleTrip(Trip):
+class CyclingTrip(Trip):
     TYPE_ROAD = "R"
     TYPE_TOURING = "T"
     TYPE_MOUNTAIN = "M"
@@ -48,3 +48,21 @@ class CycleTrip(Trip):
         (TYPE_GRAVEL, _("Gravel")),
     ]
     type = models.CharField(max_length=1, choices=TYPE_CHOICES, blank=False, null=False, db_index=True)
+
+
+class Stage(PolymorphicModel, TimeStampedModel):
+    trip = models.ForeignKey(Trip, blank=False, null=False, on_delete=models.PROTECT,)
+    gpx_file = models.FileField(upload_to=upload_to, blank=True, null=True)
+    start_date = models.DateField(blank=False, null=False)
+    end_date = models.DateField(blank=False, null=False)
+    moving_time_s = models.IntegerField(blank=True, null=True)
+    stopped_time_s = models.IntegerField(blank=True, null=True)
+    distance_km = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    uphill_m = models.DecimalField(max_digits=10, decimal_places=1, blank=True, null=True)
+    downhill_m = models.DecimalField(max_digits=10, decimal_places=1, blank=True, null=True)
+    max_speed_km_per_h = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    avg_speed_km_per_h = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+
+
+class CyclingStage(Stage):
+    pass

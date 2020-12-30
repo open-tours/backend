@@ -17,11 +17,11 @@ from django.conf import settings
 from django.contrib import admin
 from django.urls import path, re_path
 from django.views.decorators.csrf import csrf_exempt
-from graphene_django.views import GraphQLView
+from graphene_file_upload.django import FileUploadGraphQLView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("api/v1/", csrf_exempt(GraphQLView.as_view(graphiql=True))),
+    path("api/v1/", csrf_exempt(FileUploadGraphQLView.as_view(graphiql=True))),
 ]
 
 if settings.DEBUG:

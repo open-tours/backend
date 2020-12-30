@@ -11,12 +11,14 @@ https://docs.djangoproject.com/en/3.1/ref/settings/
 """
 from datetime import timedelta
 from pathlib import Path
+from typing import List
 
 import environ
 
 env = environ.Env(
     # set casting, default value
-    DEBUG=(bool, False)
+    DEBUG=(bool, False),
+    ALLOWED_HOSTS=(list, []),
 )
 
 # reading .env file
@@ -35,8 +37,7 @@ SECRET_KEY = env("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env("DEBUG")
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS: List[str] = env("ALLOWED_HOSTS")
 
 # Application definition
 INSTALLED_APPS = [
@@ -135,13 +136,13 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 THUMBNAIL_ALIASES = {
-    "trips.Trip.cover_image": {"preview": {"size": (640, 480), "crop": "smart", "autocrop": True},},
+    "trips.CyclingTrip.cover_image": {"preview": {"size": (640, 480), "crop": "smart", "autocrop": True},},
 }
 
 GRAPHENE = {"SCHEMA": "fmt.schema.schema", "MIDDLEWARE": ["graphql_jwt.middleware.JSONWebTokenMiddleware"]}
 
 GRAPHQL_JWT = {
     "JWT_VERIFY_EXPIRATION": True,
-    "JWT_EXPIRATION_DELTA": timedelta(minutes=10),
-    "JWT_REFRESH_EXPIRATION_DELTA": timedelta(days=7),
+    "JWT_EXPIRATION_DELTA": timedelta(days=365),
+    "JWT_REFRESH_EXPIRATION_DELTA": timedelta(days=365),
 }

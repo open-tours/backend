@@ -29,7 +29,7 @@ class UserPrivateType(DjangoObjectType):
         )
 
 
-class Query(object):
+class Query:
     user = Field(UserPublicType, id=Int(required=True))
     me = Field(UserPrivateType)
 
