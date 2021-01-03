@@ -1,6 +1,10 @@
 import math
+from io import StringIO
 
 import gpxpy
+from django.contrib.gis.geos import LineString, Point
+from django.core.files import File
+from django.db.transaction import atomic
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from gpxpy.gpx import GPXXMLSyntaxException
@@ -62,6 +66,7 @@ class StageTypeMixin:
 
 class CreateStage(StageTypeMixin, Mutation):
     class Arguments:
+        gpx_file = Upload()
         name = String(required=True)
         trip_id = Int(required=True)
         start_date = Date(required=True)
@@ -76,9 +81,8 @@ class CreateStage(StageTypeMixin, Mutation):
 
     @staticmethod
     @login_required
+    @atomic
     def mutate(self, info, **fields):
-        print(fields)
-
         # validate moving_time and stopped_time
         for field in ["moving_time", "stopped_time"]:
             if field not in fields:
@@ -86,10 +90,6 @@ class CreateStage(StageTypeMixin, Mutation):
 
             # validate
             if "minutes" in fields[field]:
-                if not fields[field].get("hours"):
-                    raise GraphQLError(
-                        _(f"Minutes without Hours does not makes sense for {field_name_to_readable(field)}")
-                    )
                 if fields[field]["minutes"] < 0 or fields[field]["minutes"] > 59:
                     raise GraphQLError(_(f"Minutes not in range 0-59 for {field_name_to_readable(field)}"))
 
@@ -108,8 +108,29 @@ class CreateStage(StageTypeMixin, Mutation):
             if value < 0:
                 raise GraphQLError(_(f"Value can not be negative for {field_name_to_readable(field)}"))
 
+        # create object
         get_object_or_404(CyclingTrip, pk=fields.get("trip_id"), owner=info.context.user)
-        CyclingStage.objects.create(**fields)
+        stage = CyclingStage(**fields)
+
+        gpx_file = fields.get("gpx_file")
+        if gpx_file:
+            try:
+                gpx = gpxpy.parse(gpx_file.file.read())
+                gpx.smooth(vertical=True, horizontal=False, remove_extremes=False)
+                gpx_file.seek(0)
+            except (GPXXMLSyntaxException, UnicodeDecodeError) as e:
+                print(e)
+                raise GraphQLError(_("GPX format is unknown."))
+
+            # save geojson preview
+            tolerance = 0.001
+            line_string = LineString([Point(p.point.longitude, p.point.latitude).coords for p in gpx.get_points_data()])
+            line_string = line_string.simplify(tolerance, True)
+
+            # save gpx file
+            stage.geojson_preview.save(f"{stage.pk}.json", File(StringIO(line_string.geojson)))
+
+        stage.save()
 
 
 class GPXFileInfoUpload(StageTypeMixin, Mutation):
@@ -120,60 +141,54 @@ class GPXFileInfoUpload(StageTypeMixin, Mutation):
     @login_required
     def mutate(self, info, **fields):
         gpx_file = fields["file"]
+
         try:
             gpx = gpxpy.parse(gpx_file.file.read())
-
-            if len(gpx.tracks) == 0:
-                raise GraphQLError(_("No Tracks found in your GPX file."))
-            if len(gpx.tracks) > 1:
-                raise GraphQLError(_("Only one Track in a GPX file is allowed."))
-
-            if len(gpx.tracks[0].segments) == 0:
-                raise GraphQLError(_("No Track Segments found in your GPX file."))
-            if len(gpx.tracks[0].segments) > 1:
-                raise GraphQLError(_("Only one Segment per Track in a GPX file is allowed."))
-
-            segment = gpx.tracks[0].segments[0]
-            uphill, downhill = segment.get_uphill_downhill()
-
-            gpx_info = {
-                "name": gpx.name or "",
-                "distance_km": round((segment.length_2d() or 0) / 1000, 2) or None,
-                "uphill_m": round(uphill or 0, 2) or None,
-                "downhill_m": round(downhill or 0, 2) or None,
-            }
-
-            # start end time
-            start_time, end_time = segment.get_time_bounds()
-            if start_time:
-                gpx_info["start_date"] = start_time.date()
-            if end_time:
-                gpx_info["end_date"] = end_time.date()
-
-            moving_data = segment.get_moving_data()
-            if moving_data:
-                # moving time
-                moving_time_minutes = math.floor(moving_data.moving_time / 60)
-                moving_time_hours = math.floor(moving_time_minutes / 60)
-                gpx_info["moving_time"] = HoursMinutesType(hours=moving_time_hours, minutes=moving_time_minutes % 60)
-
-                # stopped time
-                stopped_time_minutes = math.floor(moving_data.stopped_time / 60)
-                stopped_time_hours = math.floor(stopped_time_minutes / 60)
-                gpx_info["stopped_time"] = HoursMinutesType(hours=stopped_time_hours, minutes=stopped_time_minutes % 60)
-
-                # max speed
-                gpx_info["max_speed_km_per_h"] = round(moving_data.max_speed * 3600 / 1000, 2) or None
-
-                # avg speed
-                avg_speed = 0
-                if moving_data.moving_time > 0:
-                    avg_speed = moving_data.moving_distance / moving_data.moving_time
-                gpx_info["avg_speed_km_per_h"] = round(avg_speed * 3600 / 1000, 2) or None
-
-            return GPXFileInfoUpload(**gpx_info)
+            gpx.smooth(vertical=True, horizontal=False, remove_extremes=False)
         except (GPXXMLSyntaxException, UnicodeDecodeError):
             raise GraphQLError(_("GPX format is unknown."))
+
+        if len(gpx.tracks) == 0:
+            raise GraphQLError(_("No Tracks found in your GPX file."))
+
+        uphill, downhill = gpx.get_uphill_downhill()
+
+        gpx_info = {
+            "name": gpx.tracks[0].name or "" + " " + gpx.tracks[0].description or "",
+            "distance_km": round((gpx.length_2d() or 0) / 1000, 2) or None,
+            "uphill_m": round(uphill or 0, 2) or None,
+            "downhill_m": round(downhill or 0, 2) or None,
+        }
+
+        # start end time
+        start_time, end_time = gpx.get_time_bounds()
+        if start_time:
+            gpx_info["start_date"] = start_time.date()
+        if end_time:
+            gpx_info["end_date"] = end_time.date()
+
+        moving_data = gpx.get_moving_data(speed_extreemes_percentiles=0.015)
+        if moving_data:
+            # moving time
+            moving_time_minutes = math.floor(moving_data.moving_time / 60)
+            moving_time_hours = math.floor(moving_time_minutes / 60)
+            gpx_info["moving_time"] = HoursMinutesType(hours=moving_time_hours, minutes=moving_time_minutes % 60)
+
+            # stopped time
+            stopped_time_minutes = math.floor(moving_data.stopped_time / 60)
+            stopped_time_hours = math.floor(stopped_time_minutes / 60)
+            gpx_info["stopped_time"] = HoursMinutesType(hours=stopped_time_hours, minutes=stopped_time_minutes % 60)
+
+            # max speed
+            gpx_info["max_speed_km_per_h"] = round(moving_data.max_speed * 3600 / 1000, 2) or None
+
+            # avg speed
+            avg_speed = 0
+            if moving_data.moving_time > 0:
+                avg_speed = moving_data.moving_distance / moving_data.moving_time
+            gpx_info["avg_speed_km_per_h"] = round(avg_speed * 3600 / 1000, 2) or None
+
+        return GPXFileInfoUpload(**gpx_info)
 
 
 class Query:

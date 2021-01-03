@@ -4,6 +4,7 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
+pre-commit = "*"
 
 [packages]
 graphene-django = "*"
@@ -15,9 +16,9 @@ django-model-utils = "*"
 django-polymorphic = "*"
 pillow = "*"
 easy-thumbnails = "*"
-gpxpy = "*"
 lxml = "*"
 graphene-file-upload = "*"
+gpxpy = {editable = true, git = "https://github.com/tkrajina/gpxpy.git", ref = "e3733bbd59d11bcbf089f30b286286fcd728bb46"}
 
 [requires]
 python_version = "3"
