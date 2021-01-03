@@ -1,8 +1,8 @@
 from django.contrib import admin
 
-from .models import CyclingTrip
+from .models import CyclingTour
 
 
-@admin.register(CyclingTrip)
+@admin.register(CyclingTour)
 class CyclingTripAdmin(admin.ModelAdmin):
     pass

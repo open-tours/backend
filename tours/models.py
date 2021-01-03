@@ -14,10 +14,10 @@ def upload_to(instance, filename):
     ext = os.path.splitext(filename)[1]
     filename = f"{uuid.uuid4()}{ext}"
     today_path = timezone.now().strftime("%Y/%m/%d")
-    return os.path.join(f"uploads/trips/{today_path}", filename)
+    return os.path.join(f"uploads/tours/{today_path}", filename)
 
 
-class Trip(PolymorphicModel, TimeStampedModel):
+class Tour(PolymorphicModel, TimeStampedModel):
     name = models.CharField(max_length=1024, blank=False, null=False)
     start_date = models.DateField(blank=False, null=False)
     end_date = models.DateField(blank=False, null=False)
@@ -36,7 +36,7 @@ class Trip(PolymorphicModel, TimeStampedModel):
         return request.build_absolute_uri(image_url_path)
 
 
-class CyclingTrip(Trip):
+class CyclingTour(Tour):
     TYPE_ROAD = "R"
     TYPE_TOURING = "T"
     TYPE_MOUNTAIN = "M"
@@ -51,9 +51,9 @@ class CyclingTrip(Trip):
 
 
 class Stage(PolymorphicModel, TimeStampedModel):
-    trip = models.ForeignKey(Trip, blank=False, null=False, on_delete=models.PROTECT,)
     gpx_file = models.FileField(upload_to=upload_to, blank=True, null=True)
     name = models.CharField(max_length=1024, blank=False, null=False)
+    tour = models.ForeignKey(Tour, blank=False, null=False, on_delete=models.PROTECT,)
     gpx = models.FileField(upload_to=upload_to, blank=True, null=True)
     geojson_preview = models.FileField(upload_to=upload_to, blank=True, null=True)
     start_date = models.DateField(blank=False, null=False)

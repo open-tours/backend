@@ -17,12 +17,12 @@ from graphql_jwt.decorators import login_required
 from users.schema import UserPublicType
 from utils.graphene import field_name_to_readable
 
-from .models import CyclingStage, CyclingTrip
+from .models import CyclingStage, CyclingTour
 
 
-class TripType(DjangoObjectType):
+class TourType(DjangoObjectType):
     class Meta:
-        model = CyclingTrip
+        model = CyclingTour
         fields = (
             "id",
             "name",
@@ -68,7 +68,7 @@ class CreateStage(StageTypeMixin, Mutation):
     class Arguments:
         gpx_file = Upload()
         name = String(required=True)
-        trip_id = Int(required=True)
+        tour_id = Int(required=True)
         start_date = Date(required=True)
         end_date = Date(required=True)
         distance_km = Float()
@@ -109,7 +109,7 @@ class CreateStage(StageTypeMixin, Mutation):
                 raise GraphQLError(_(f"Value can not be negative for {field_name_to_readable(field)}"))
 
         # create object
-        get_object_or_404(CyclingTrip, pk=fields.get("trip_id"), owner=info.context.user)
+        get_object_or_404(CyclingTour, pk=fields.get("tour_id"), owner=info.context.user)
         stage = CyclingStage(**fields)
 
         gpx_file = fields.get("gpx_file")
@@ -192,21 +192,21 @@ class GPXFileInfoUpload(StageTypeMixin, Mutation):
 
 
 class Query:
-    trips = List(TripType)
-    trip = Field(TripType, id=Int(required=True))
-    my_trips = List(TripType)
+    tours = List(TourType)
+    tour = Field(TourType, id=Int(required=True))
+    my_tours = List(TourType)
 
     @staticmethod
-    def resolve_trips(self, info, **kwargs):
-        return CyclingTrip.objects.all()
+    def resolve_tours(self, info, **kwargs):
+        return CyclingTour.objects.all()
 
     @staticmethod
-    def resolve_trip(self, info, **kwargs):
-        return CyclingTrip.objects.get(**kwargs)
+    def resolve_tour(self, info, **kwargs):
+        return get_object_or_404(CyclingTour, owner=info.context.user, **kwargs)
 
     @login_required
-    def resolve_my_trips(self, info):
-        return CyclingTrip.objects.filter(owner=info.context.user)
+    def resolve_my_tours(self, info):
+        return CyclingTour.objects.filter(owner=info.context.user)
 
 
 class Mutation(ObjectType):
