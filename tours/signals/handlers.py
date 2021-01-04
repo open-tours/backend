@@ -7,7 +7,7 @@ from easy_thumbnails.signals import saved_file
 saved_file.connect(generate_aliases_global)
 
 
-# delete easy_thumbnails images on
+# delete easy_thumbnails images on file delete
 def easy_thumbnails_delete(**kwargs):
     thumbnailer = get_thumbnailer(kwargs["file"])
     thumbnailer.delete_thumbnails()
