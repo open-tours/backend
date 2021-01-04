@@ -39,7 +39,6 @@ DEBUG = env("DEBUG")
 
 ALLOWED_HOSTS: List[str] = env("ALLOWED_HOSTS")
 
-# Application definition
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -50,9 +49,11 @@ INSTALLED_APPS = [
     "graphene_django",
     "polymorphic",
     "easy_thumbnails",
+    "django_cleanup.apps.CleanupConfig",
     "users.apps.UsersConfig",
     "tours.apps.ToursConfig",
 ]
+# Application definition
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -122,12 +123,12 @@ USE_TZ = True
 VAR_ROOT = BASE_DIR.joinpath("var")
 
 MEDIA_ROOT = VAR_ROOT.joinpath("media")
-MEDIA_URL = "/media/"
+MEDIA_URL = env("MEDIA_URL")
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
 STATIC_ROOT = MEDIA_ROOT.joinpath("static")
-STATIC_URL = "/static/"
+STATIC_URL = env("STATIC_URL")
 
 AUTH_USER_MODEL = "users.User"
 

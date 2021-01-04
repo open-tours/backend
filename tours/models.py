@@ -51,10 +51,12 @@ class CyclingTour(Tour):
 
 
 class Stage(PolymorphicModel, TimeStampedModel):
-    gpx_file = models.FileField(upload_to=upload_to, blank=True, null=True)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, blank=False, null=False)
     name = models.CharField(max_length=1024, blank=False, null=False)
-    tour = models.ForeignKey(Tour, blank=False, null=False, on_delete=models.PROTECT,)
-    gpx = models.FileField(upload_to=upload_to, blank=True, null=True)
+    description = models.TextField(max_length=102400, blank=True, null=True)
+    cover_image = models.ImageField(upload_to=upload_to, blank=True, null=True)
+    tour = models.ForeignKey(Tour, blank=False, null=True, on_delete=models.PROTECT,)
+    gpx_file = models.FileField(upload_to=upload_to, blank=True, null=True)
     geojson_preview = models.FileField(upload_to=upload_to, blank=True, null=True)
     start_date = models.DateField(blank=False, null=False)
     end_date = models.DateField(blank=False, null=False)
@@ -68,6 +70,17 @@ class Stage(PolymorphicModel, TimeStampedModel):
 
     class Meta:
         ordering = ["start_date"]
+
+    def get_cover_image_preview_abs_url(self, request):
+        if not self.cover_image.name:
+            return None
+        thumbnailer = get_thumbnailer(self.cover_image)
+        image_url_path = thumbnailer["preview"].url
+        return request.build_absolute_uri(image_url_path)
+
+    def get_geojson_preview_abs_url(self, request):
+        if self.geojson_preview.name:
+            return request.build_absolute_uri(self.geojson_preview.url)
 
 
 class CyclingStage(Stage):

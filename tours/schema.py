@@ -8,7 +8,7 @@ from django.db.transaction import atomic
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from gpxpy.gpx import GPXXMLSyntaxException
-from graphene import Argument, Date, Field, Float, InputObjectType, Int, List, Mutation, ObjectType, String
+from graphene import ID, Argument, Date, Field, Float, InputObjectType, Int, List, Mutation, ObjectType, String
 from graphene_django.types import DjangoObjectType
 from graphene_file_upload.scalars import Upload
 from graphql import GraphQLError
@@ -18,27 +18,6 @@ from users.schema import UserPublicType
 from utils.graphene import field_name_to_readable
 
 from .models import CyclingStage, CyclingTour
-
-
-class TourType(DjangoObjectType):
-    class Meta:
-        model = CyclingTour
-        fields = (
-            "id",
-            "name",
-            "start_date",
-            "end_date",
-            "description",
-            "owner",
-            "created",
-        )
-
-    owner = Field(UserPublicType)
-    cover_image = Field(String)
-
-    @staticmethod
-    def resolve_cover_image(self, info):
-        return self.get_cover_image_preview_abs_url(info.context)
 
 
 class HoursMinutesType(ObjectType):
@@ -53,6 +32,9 @@ class HoursMinutesArgument(InputObjectType):
 
 class StageTypeMixin:
     name = String()
+    owner = Field(UserPublicType)
+    description = String()
+    cover_image = Field(String)
     start_date = Date()
     end_date = Date()
     distance_km = Float()
@@ -64,11 +46,50 @@ class StageTypeMixin:
     downhill_m = Float()
 
 
+class StageType(StageTypeMixin, DjangoObjectType):
+    class Meta:
+        model = CyclingStage
+        fields = (
+            "id",
+            "name",
+            "owner",
+            "description",
+            "start_date",
+            "end_date",
+            "created",
+        )
+
+    geojson_preview = String()
+
+    @staticmethod
+    def resolve_moving_time(self, info):
+        if self.moving_time_s:
+            minutes = math.floor(self.moving_time_s / 60)
+            hours = math.floor(minutes / 60)
+            return HoursMinutesType(hours=hours, minutes=minutes % 60)
+
+    @staticmethod
+    def resolve_stopped_time(self, info):
+        if self.stopped_time_s:
+            minutes = math.floor(self.stopped_time_s / 60)
+            hours = math.floor(minutes / 60)
+            return HoursMinutesType(hours=hours, minutes=minutes % 60)
+
+    @staticmethod
+    def resolve_cover_image(self, info):
+        return self.get_cover_image_preview_abs_url(info.context)
+
+    @staticmethod
+    def resolve_geojson_preview(self, info):
+        return self.get_geojson_preview_abs_url(info.context)
+
+
 class CreateStage(StageTypeMixin, Mutation):
     class Arguments:
-        gpx_file = Upload()
         name = String(required=True)
-        tour_id = Int(required=True)
+        description = String()
+        tour_id = ID()
+        gpx_file = Upload()
         start_date = Date(required=True)
         end_date = Date(required=True)
         distance_km = Float()
@@ -108,9 +129,13 @@ class CreateStage(StageTypeMixin, Mutation):
             if value < 0:
                 raise GraphQLError(_(f"Value can not be negative for {field_name_to_readable(field)}"))
 
-        # create object
-        get_object_or_404(CyclingTour, pk=fields.get("tour_id"), owner=info.context.user)
-        stage = CyclingStage(**fields)
+        # validate tour
+        tour_id = fields.get("tour_id")
+        if tour_id:
+            print(tour_id)
+            get_object_or_404(CyclingTour, pk=tour_id, owner=info.context.user)
+        # create stage
+        stage = CyclingStage(owner=info.context.user, **fields)
 
         gpx_file = fields.get("gpx_file")
         if gpx_file:
@@ -123,7 +148,7 @@ class CreateStage(StageTypeMixin, Mutation):
                 raise GraphQLError(_("GPX format is unknown."))
 
             # save geojson preview
-            tolerance = 0.001
+            tolerance = 0.0001
             line_string = LineString([Point(p.point.longitude, p.point.latitude).coords for p in gpx.get_points_data()])
             line_string = line_string.simplify(tolerance, True)
 
@@ -153,8 +178,21 @@ class GPXFileInfoUpload(StageTypeMixin, Mutation):
 
         uphill, downhill = gpx.get_uphill_downhill()
 
+        # construct name from track / gpx metadata
+        name = ""
+        if gpx.name:
+            name = gpx.name
+        if gpx.description:
+            name += f" {gpx.description}"
+        if gpx.tracks[0].name and gpx.tracks[0].name not in name:
+            name += gpx.tracks[0].name
+        if gpx.tracks[0].description and gpx.tracks[0].description not in name:
+            name += f" {gpx.tracks[0].description}"
+        if not name:
+            name = None
+
         gpx_info = {
-            "name": gpx.tracks[0].name or "" + " " + gpx.tracks[0].description or "",
+            "name": name,
             "distance_km": round((gpx.length_2d() or 0) / 1000, 2) or None,
             "uphill_m": round(uphill or 0, 2) or None,
             "downhill_m": round(downhill or 0, 2) or None,
@@ -191,24 +229,65 @@ class GPXFileInfoUpload(StageTypeMixin, Mutation):
         return GPXFileInfoUpload(**gpx_info)
 
 
+class TourType(DjangoObjectType):
+    class Meta:
+        model = CyclingTour
+        fields = (
+            "id",
+            "name",
+            "start_date",
+            "end_date",
+            "description",
+            "owner",
+            "created",
+        )
+
+    owner = Field(UserPublicType)
+    cover_image = Field(String)
+    stages = List(StageType)
+
+    @staticmethod
+    def resolve_cover_image(self, info):
+        return self.get_cover_image_preview_abs_url(info.context)
+
+    @staticmethod
+    def resolve_stages(self, info):
+        return self.stage_set.all()
+
+
 class Query:
+    tour = Field(TourType, id=ID(required=True))
     tours = List(TourType)
-    tour = Field(TourType, id=Int(required=True))
+    stage = Field(StageType, id=ID(required=True))
+    stages = List(StageType)
     my_tours = List(TourType)
+    my_stages = List(StageType)
+
+    @staticmethod
+    def resolve_tour(self, info, **kwargs):
+        return CyclingTour.objects.get(**kwargs)
 
     @staticmethod
     def resolve_tours(self, info, **kwargs):
         return CyclingTour.objects.all()
 
     @staticmethod
-    def resolve_tour(self, info, **kwargs):
-        return get_object_or_404(CyclingTour, owner=info.context.user, **kwargs)
+    def resolve_stage(self, info, **kwargs):
+        return CyclingStage.objects.get(**kwargs)
+
+    @staticmethod
+    def resolve_stages(self, info, **kwargs):
+        return CyclingStage.objects.all()
 
     @login_required
     def resolve_my_tours(self, info):
         return CyclingTour.objects.filter(owner=info.context.user)
 
+    @login_required
+    def resolve_my_stages(self, info):
+        return CyclingStage.objects.filter(owner=info.context.user).order_by("-pk")
+
 
 class Mutation(ObjectType):
     gpx_file_info = GPXFileInfoUpload.Field()
-    stageCreate = CreateStage().Field()
+    stage_create = CreateStage().Field()
