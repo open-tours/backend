@@ -17,7 +17,7 @@ from graphql_jwt.decorators import login_required
 from users.schema import UserPublicType
 from utils.graphene import field_name_to_readable
 
-from .models import CyclingStage, CyclingTour
+from .models import CyclingTour, CyclingTrack
 
 
 class HoursMinutesType(ObjectType):
@@ -30,7 +30,7 @@ class HoursMinutesArgument(InputObjectType):
     minutes = Int()
 
 
-class StageTypeMixin:
+class TrackTypeMixin:
     name = String()
     owner = Field(UserPublicType)
     description = String()
@@ -46,9 +46,9 @@ class StageTypeMixin:
     downhill_m = Float()
 
 
-class StageType(StageTypeMixin, DjangoObjectType):
+class TrackType(TrackTypeMixin, DjangoObjectType):
     class Meta:
-        model = CyclingStage
+        model = CyclingTrack
         fields = (
             "id",
             "name",
@@ -84,7 +84,7 @@ class StageType(StageTypeMixin, DjangoObjectType):
         return self.get_geojson_preview_abs_url(info.context)
 
 
-class CreateStage(StageTypeMixin, Mutation):
+class CreateTrack(TrackTypeMixin, Mutation):
     class Arguments:
         name = String(required=True)
         description = String()
@@ -134,8 +134,8 @@ class CreateStage(StageTypeMixin, Mutation):
         if tour_id:
             print(tour_id)
             get_object_or_404(CyclingTour, pk=tour_id, owner=info.context.user)
-        # create stage
-        stage = CyclingStage(owner=info.context.user, **fields)
+        # create track
+        track = CyclingTrack(owner=info.context.user, **fields)
 
         gpx_file = fields.get("gpx_file")
         if gpx_file:
@@ -153,12 +153,12 @@ class CreateStage(StageTypeMixin, Mutation):
             line_string = line_string.simplify(tolerance, True)
 
             # save gpx file
-            stage.geojson_preview.save(f"{stage.pk}.json", File(StringIO(line_string.geojson)))
+            track.geojson_preview.save(f"{track.pk}.json", File(StringIO(line_string.geojson)))
 
-        stage.save()
+        track.save()
 
 
-class GPXFileInfoUpload(StageTypeMixin, Mutation):
+class GPXFileInfoUpload(TrackTypeMixin, Mutation):
     class Arguments:
         file = Upload(required=True)
 
@@ -244,24 +244,24 @@ class TourType(DjangoObjectType):
 
     owner = Field(UserPublicType)
     cover_image = Field(String)
-    stages = List(StageType)
+    tracks = List(TrackType)
 
     @staticmethod
     def resolve_cover_image(self, info):
         return self.get_cover_image_preview_abs_url(info.context)
 
     @staticmethod
-    def resolve_stages(self, info):
-        return self.stage_set.all()
+    def resolve_track(self, info):
+        return self.track_set.all()
 
 
 class Query:
     tour = Field(TourType, id=ID(required=True))
     tours = List(TourType)
-    stage = Field(StageType, id=ID(required=True))
-    stages = List(StageType)
+    track = Field(TrackType, id=ID(required=True))
+    tracks = List(TrackType)
     my_tours = List(TourType)
-    my_stages = List(StageType)
+    my_tracks = List(TrackType)
 
     @staticmethod
     def resolve_tour(self, info, **kwargs):
@@ -272,22 +272,22 @@ class Query:
         return CyclingTour.objects.all()
 
     @staticmethod
-    def resolve_stage(self, info, **kwargs):
-        return CyclingStage.objects.get(**kwargs)
+    def resolve_track(self, info, **kwargs):
+        return CyclingTrack.objects.get(**kwargs)
 
     @staticmethod
-    def resolve_stages(self, info, **kwargs):
-        return CyclingStage.objects.all()
+    def resolve_tracks(self, info, **kwargs):
+        return CyclingTrack.objects.all()
 
     @login_required
     def resolve_my_tours(self, info):
         return CyclingTour.objects.filter(owner=info.context.user)
 
     @login_required
-    def resolve_my_stages(self, info):
-        return CyclingStage.objects.filter(owner=info.context.user).order_by("-pk")
+    def resolve_my_tracks(self, info):
+        return CyclingTrack.objects.filter(owner=info.context.user).order_by("-pk")
 
 
 class Mutation(ObjectType):
     gpx_file_info = GPXFileInfoUpload.Field()
-    stage_create = CreateStage().Field()
+    track_create = CreateTrack().Field()

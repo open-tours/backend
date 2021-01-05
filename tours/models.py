@@ -50,7 +50,7 @@ class CyclingTour(Tour):
     type = models.CharField(max_length=1, choices=TYPE_CHOICES, blank=False, null=False, db_index=True)
 
 
-class Stage(PolymorphicModel, TimeStampedModel):
+class Track(PolymorphicModel, TimeStampedModel):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, blank=False, null=False)
     name = models.CharField(max_length=1024, blank=False, null=False)
     description = models.TextField(max_length=102400, blank=True, null=True)
@@ -83,5 +83,5 @@ class Stage(PolymorphicModel, TimeStampedModel):
             return request.build_absolute_uri(self.geojson_preview.url)
 
 
-class CyclingStage(Stage):
+class CyclingTrack(Track):
     pass

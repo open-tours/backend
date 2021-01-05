@@ -4,5 +4,5 @@ from .models import CyclingTour
 
 
 @admin.register(CyclingTour)
-class CyclingTripAdmin(admin.ModelAdmin):
+class CyclingTrackAdmin(admin.ModelAdmin):
     pass
