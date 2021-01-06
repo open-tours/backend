@@ -20,6 +20,7 @@ lxml = "*"
 graphene-file-upload = "*"
 gpxpy = {editable = true, git = "https://github.com/tkrajina/gpxpy.git", ref = "e3733bbd59d11bcbf089f30b286286fcd728bb46"}
 django-cleanup = "*"
+exif = "*"
 
 [requires]
 python_version = "3"

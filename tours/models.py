@@ -6,8 +6,11 @@ from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from easy_thumbnails.files import get_thumbnailer
+from exif import Image
 from model_utils.models import TimeStampedModel
 from polymorphic.models import PolymorphicModel
+
+from .utils.geo import degrees_minutes_seconds_to_decimal
 
 
 def upload_to(instance, filename):
@@ -21,8 +24,8 @@ class Tour(PolymorphicModel, TimeStampedModel):
     name = models.CharField(max_length=1024, blank=False, null=False)
     start_date = models.DateField(blank=False, null=False)
     end_date = models.DateField(blank=False, null=False)
-    description = models.TextField(max_length=102400, blank=True, null=True)
-    cover_image = models.ImageField(upload_to=upload_to, blank=True, null=True)
+    description = models.TextField(max_length=102400, blank=False, null=True)
+    cover_image = models.ImageField(upload_to=upload_to, blank=False, null=True)
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT,)
 
     class Meta:
@@ -53,20 +56,19 @@ class CyclingTour(Tour):
 class Track(PolymorphicModel, TimeStampedModel):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, blank=False, null=False)
     name = models.CharField(max_length=1024, blank=False, null=False)
-    description = models.TextField(max_length=102400, blank=True, null=True)
-    cover_image = models.ImageField(upload_to=upload_to, blank=True, null=True)
+    description = models.TextField(max_length=102400, blank=False, null=True)
     tour = models.ForeignKey(Tour, blank=False, null=True, on_delete=models.PROTECT,)
-    gpx_file = models.FileField(upload_to=upload_to, blank=True, null=True)
-    geojson_preview = models.FileField(upload_to=upload_to, blank=True, null=True)
+    gpx_file = models.FileField(upload_to=upload_to, blank=False, null=True)
+    geojson = models.FileField(upload_to=upload_to, blank=False, null=True)
     start_date = models.DateField(blank=False, null=False)
     end_date = models.DateField(blank=False, null=False)
-    moving_time_s = models.IntegerField(blank=True, null=True)
-    stopped_time_s = models.IntegerField(blank=True, null=True)
-    distance_km = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    uphill_m = models.DecimalField(max_digits=10, decimal_places=1, blank=True, null=True)
-    downhill_m = models.DecimalField(max_digits=10, decimal_places=1, blank=True, null=True)
-    max_speed_km_per_h = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    avg_speed_km_per_h = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    moving_time_s = models.IntegerField(blank=False, null=True)
+    stopped_time_s = models.IntegerField(blank=False, null=True)
+    distance_km = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=True)
+    uphill_m = models.DecimalField(max_digits=10, decimal_places=1, blank=False, null=True)
+    downhill_m = models.DecimalField(max_digits=10, decimal_places=1, blank=False, null=True)
+    max_speed_km_per_h = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=True)
+    avg_speed_km_per_h = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=True)
 
     class Meta:
         ordering = ["start_date"]
@@ -78,9 +80,25 @@ class Track(PolymorphicModel, TimeStampedModel):
         image_url_path = thumbnailer["preview"].url
         return request.build_absolute_uri(image_url_path)
 
-    def get_geojson_preview_abs_url(self, request):
-        if self.geojson_preview.name:
-            return request.build_absolute_uri(self.geojson_preview.url)
+    def get_geojson_abs_url(self, request):
+        if self.geojson.name:
+            return request.build_absolute_uri(self.geojson.url)
+
+
+class TrackImage(models.Model):
+    track = models.ForeignKey(Track, blank=False, null=False, on_delete=models.CASCADE)
+    file = models.ImageField(upload_to=upload_to, blank=False, null=False)
+    longitude = models.DecimalField(max_digits=8, decimal_places=5, blank=False, null=True)
+    latitude = models.DecimalField(max_digits=8, decimal_places=5, blank=False, null=True)
+
+    def save(self, *args, **kwargs):
+        # save lat / long
+        exif_data = Image(self.file.read())
+        if hasattr(exif_data, "gps_longitude") and hasattr(exif_data, "gps_latitude"):
+            self.longitude = degrees_minutes_seconds_to_decimal(*exif_data.gps_longitude)
+            self.latitude = degrees_minutes_seconds_to_decimal(*exif_data.gps_latitude)
+
+        super().save(*args, **kwargs)
 
 
 class CyclingTrack(Track):

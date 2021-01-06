@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "82120ce157733b4f9b8a87fd0b2ba56aecee2d69ceee6213315866cb7e348605"
+            "sha256": "273c3cf14cae64c01fc78f933c93eafe6ae416ba8946b45fb787842439440122"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -85,6 +85,14 @@
             ],
             "index": "pypi",
             "version": "==2.7.1"
+        },
+        "exif": {
+            "hashes": [
+                "sha256:87699a3032b902dc72b6e565c51ce2711390cb6d5a7689ff12e04ba427dc95c2",
+                "sha256:dc53ffc2e09245676944367b0b7038d6cb7d73175d80b4ec9d84333d1af17500"
+            ],
+            "index": "pypi",
+            "version": "==1.0.4"
         },
         "gpxpy": {
             "editable": true,
@@ -207,6 +215,13 @@
             ],
             "index": "pypi",
             "version": "==8.1.0"
+        },
+        "plum-py": {
+            "hashes": [
+                "sha256:9328ec7502046134c5f16b04d85947559006e200d7268b7d5ed30f88735a48e5"
+            ],
+            "markers": "python_version >= '3.6'",
+            "version": "==0.3.1"
         },
         "promise": {
             "hashes": [

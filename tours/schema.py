@@ -2,6 +2,7 @@ import math
 from io import StringIO
 
 import gpxpy
+from django.conf import settings as s
 from django.contrib.gis.geos import LineString, Point
 from django.core.files import File
 from django.db.transaction import atomic
@@ -17,7 +18,7 @@ from graphql_jwt.decorators import login_required
 from users.schema import UserPublicType
 from utils.graphene import field_name_to_readable
 
-from .models import CyclingTour, CyclingTrack
+from .models import CyclingTour, CyclingTrack, TrackImage
 
 
 class HoursMinutesType(ObjectType):
@@ -34,7 +35,6 @@ class TrackTypeMixin:
     name = String()
     owner = Field(UserPublicType)
     description = String()
-    cover_image = Field(String)
     start_date = Date()
     end_date = Date()
     distance_km = Float()
@@ -44,6 +44,7 @@ class TrackTypeMixin:
     avg_speed_km_per_h = Float()
     uphill_m = Float()
     downhill_m = Float()
+    images = List(Upload)
 
 
 class TrackType(TrackTypeMixin, DjangoObjectType):
@@ -59,7 +60,7 @@ class TrackType(TrackTypeMixin, DjangoObjectType):
             "created",
         )
 
-    geojson_preview = String()
+    geojson = String()
 
     @staticmethod
     def resolve_moving_time(self, info):
@@ -76,12 +77,8 @@ class TrackType(TrackTypeMixin, DjangoObjectType):
             return HoursMinutesType(hours=hours, minutes=minutes % 60)
 
     @staticmethod
-    def resolve_cover_image(self, info):
-        return self.get_cover_image_preview_abs_url(info.context)
-
-    @staticmethod
-    def resolve_geojson_preview(self, info):
-        return self.get_geojson_preview_abs_url(info.context)
+    def resolve_geojson(self, info):
+        return self.get_geojson_abs_url(info.context)
 
 
 class CreateTrack(TrackTypeMixin, Mutation):
@@ -99,6 +96,7 @@ class CreateTrack(TrackTypeMixin, Mutation):
         avg_speed_km_per_h = Float()
         uphill_m = Float()
         downhill_m = Float()
+        images = List(Upload)
 
     @staticmethod
     @login_required
@@ -110,15 +108,15 @@ class CreateTrack(TrackTypeMixin, Mutation):
                 continue
 
             # validate
-            if "minutes" in fields[field]:
+            if (fields[field].get("hours") or 0) < 0:
+                raise GraphQLError(_(f"Hours can not be negative for {field_name_to_readable(field)}"))
+            if fields[field].get("minutes"):
                 if fields[field]["minutes"] < 0 or fields[field]["minutes"] > 59:
                     raise GraphQLError(_(f"Minutes not in range 0-59 for {field_name_to_readable(field)}"))
 
-            if fields[field]["hours"] < 0:
-                raise GraphQLError(_(f"Hours can not be negative for {field_name_to_readable(field)}"))
-
             # to seconds
-            fields[f"{field}_s"] = fields[field]["hours"] * 3600 + fields[field]["minutes"] * 60
+            if fields[field]["hours"] or fields[field]["minutes"]:
+                fields[f"{field}_s"] = (fields[field]["hours"] or 0) * 3600 + (fields[field]["minutes"] or 0) * 60
             del fields[field]
 
         # force positive int/float values
@@ -132,11 +130,22 @@ class CreateTrack(TrackTypeMixin, Mutation):
         # validate tour
         tour_id = fields.get("tour_id")
         if tour_id:
-            print(tour_id)
             get_object_or_404(CyclingTour, pk=tour_id, owner=info.context.user)
+
         # create track
+        images = fields.get("images", [])
+        del fields["images"]
+
+        # validate images
+        for image in images:
+            if image.content_type not in s.IMAGE_ALLOWED_CONTENT_TYPES:
+                raise GraphQLError(_("Invalid image type"))
+            if image.size > s.IMAGE_MAX_FILESIZE_BYTES:
+                raise GraphQLError(_("Image file size too large"))
+
         track = CyclingTrack(owner=info.context.user, **fields)
 
+        # append gpx file
         gpx_file = fields.get("gpx_file")
         if gpx_file:
             try:
@@ -153,9 +162,15 @@ class CreateTrack(TrackTypeMixin, Mutation):
             line_string = line_string.simplify(tolerance, True)
 
             # save gpx file
-            track.geojson_preview.save(f"{track.pk}.json", File(StringIO(line_string.geojson)))
+            track.geojson.save(f"{track.pk}.json", File(StringIO(line_string.geojson)))
 
         track.save()
+
+        # add images
+        for image in images:
+            TrackImage.objects.create(
+                track=track, file=image,
+            )
 
 
 class GPXFileInfoUpload(TrackTypeMixin, Mutation):
@@ -243,12 +258,7 @@ class TourType(DjangoObjectType):
         )
 
     owner = Field(UserPublicType)
-    cover_image = Field(String)
     tracks = List(TrackType)
-
-    @staticmethod
-    def resolve_cover_image(self, info):
-        return self.get_cover_image_preview_abs_url(info.context)
 
     @staticmethod
     def resolve_track(self, info):
