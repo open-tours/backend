@@ -31,7 +31,7 @@ class Tour(PolymorphicModel, TimeStampedModel):
     class Meta:
         ordering = ["-id"]
 
-    def get_cover_image_preview_abs_url(self, request):
+    def get_cover_image_preview_url(self, request):
         if not self.cover_image.name:
             return None
         thumbnailer = get_thumbnailer(self.cover_image)
@@ -73,14 +73,7 @@ class Track(PolymorphicModel, TimeStampedModel):
     class Meta:
         ordering = ["start_date"]
 
-    def get_cover_image_preview_abs_url(self, request):
-        if not self.cover_image.name:
-            return None
-        thumbnailer = get_thumbnailer(self.cover_image)
-        image_url_path = thumbnailer["preview"].url
-        return request.build_absolute_uri(image_url_path)
-
-    def get_geojson_abs_url(self, request):
+    def get_geojson_url(self, request):
         if self.geojson.name:
             return request.build_absolute_uri(self.geojson.url)
 
@@ -90,6 +83,11 @@ class TrackImage(models.Model):
     file = models.ImageField(upload_to=upload_to, blank=False, null=False)
     longitude = models.DecimalField(max_digits=8, decimal_places=5, blank=False, null=True)
     latitude = models.DecimalField(max_digits=8, decimal_places=5, blank=False, null=True)
+
+    def get_preview_url(self, request):
+        thumbnailer = get_thumbnailer(self.file)
+        image_url_path = thumbnailer["preview"].url
+        return request.build_absolute_uri(image_url_path)
 
     def save(self, *args, **kwargs):
         # save lat / long

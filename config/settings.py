@@ -138,7 +138,7 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 THUMBNAIL_ALIASES = {
-    "tours.CyclingTour.cover_image": {"preview": {"size": (640, 480), "crop": "smart", "autocrop": True},},
+    "tours.TrackImage.file": {"preview": {"size": (640, 480), "crop": False, "upscale": True},},
 }
 
 GRAPHENE = {"SCHEMA": "config.schema.schema", "MIDDLEWARE": ["graphql_jwt.middleware.JSONWebTokenMiddleware"]}
@@ -150,4 +150,4 @@ GRAPHQL_JWT = {
 }
 
 IMAGE_ALLOWED_CONTENT_TYPES = ["image/jpeg"]
-IMAGE_MAX_FILESIZE_BYTES = 10 * 1024 * 1024
+IMAGE_MAX_FILESIZE_BYTES = 15 * 1024 * 1024

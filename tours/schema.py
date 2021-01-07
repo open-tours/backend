@@ -31,6 +31,12 @@ class HoursMinutesArgument(InputObjectType):
     minutes = Int()
 
 
+class ImageType(ObjectType):
+    url = String()
+    longitude = Float()
+    latitude = Float()
+
+
 class TrackTypeMixin:
     name = String()
     owner = Field(UserPublicType)
@@ -61,6 +67,7 @@ class TrackType(TrackTypeMixin, DjangoObjectType):
         )
 
     geojson = String()
+    preview_images = List(ImageType)
 
     @staticmethod
     def resolve_moving_time(self, info):
@@ -78,7 +85,16 @@ class TrackType(TrackTypeMixin, DjangoObjectType):
 
     @staticmethod
     def resolve_geojson(self, info):
-        return self.get_geojson_abs_url(info.context)
+        return self.get_geojson_url(info.context)
+
+    @staticmethod
+    def resolve_preview_images(self, info):
+        images = []
+        for image in self.trackimage_set.all():
+            images.append(
+                ImageType(url=image.get_preview_url(info.context), longitude=image.longitude, latitude=image.latitude)
+            )
+        return images
 
 
 class CreateTrack(TrackTypeMixin, Mutation):
@@ -133,8 +149,9 @@ class CreateTrack(TrackTypeMixin, Mutation):
             get_object_or_404(CyclingTour, pk=tour_id, owner=info.context.user)
 
         # create track
-        images = fields.get("images", [])
-        del fields["images"]
+        images = fields.get("images", []) or []
+        if "images" in fields:
+            del fields["images"]
 
         # validate images
         for image in images:
