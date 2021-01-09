@@ -138,7 +138,10 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 THUMBNAIL_ALIASES = {
-    "tours.TrackImage.file": {"preview": {"size": (640, 480), "crop": False, "upscale": True},},
+    "tours.TrackPhoto.file": {
+        "icon": {"size": (64, 48), "crop": False, "upscale": True},
+        "preview": {"size": (1920, 1440), "crop": False, "upscale": True},
+    },
 }
 
 GRAPHENE = {"SCHEMA": "config.schema.schema", "MIDDLEWARE": ["graphql_jwt.middleware.JSONWebTokenMiddleware"]}

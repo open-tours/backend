@@ -18,7 +18,7 @@ from graphql_jwt.decorators import login_required
 from users.schema import UserPublicType
 from utils.graphene import field_name_to_readable
 
-from .models import CyclingTour, CyclingTrack, TrackImage
+from .models import CyclingTour, CyclingTrack, TrackPhoto
 
 
 class HoursMinutesType(ObjectType):
@@ -31,13 +31,16 @@ class HoursMinutesArgument(InputObjectType):
     minutes = Int()
 
 
-class ImageType(ObjectType):
+class PhotoType(ObjectType):
     url = String()
+    icon_url = String()
+    preview_url = String()
     longitude = Float()
     latitude = Float()
 
 
 class TrackTypeMixin:
+    id = ID()
     name = String()
     owner = Field(UserPublicType)
     description = String()
@@ -50,7 +53,7 @@ class TrackTypeMixin:
     avg_speed_km_per_h = Float()
     uphill_m = Float()
     downhill_m = Float()
-    images = List(Upload)
+    photos = List(Upload)
 
 
 class TrackType(TrackTypeMixin, DjangoObjectType):
@@ -67,7 +70,7 @@ class TrackType(TrackTypeMixin, DjangoObjectType):
         )
 
     geojson = String()
-    preview_images = List(ImageType)
+    photos = List(PhotoType)
 
     @staticmethod
     def resolve_moving_time(self, info):
@@ -88,13 +91,19 @@ class TrackType(TrackTypeMixin, DjangoObjectType):
         return self.get_geojson_url(info.context)
 
     @staticmethod
-    def resolve_preview_images(self, info):
-        images = []
-        for image in self.trackimage_set.all():
-            images.append(
-                ImageType(url=image.get_preview_url(info.context), longitude=image.longitude, latitude=image.latitude)
+    def resolve_photos(self, info):
+        photos = []
+        for photo in self.trackphoto_set.all():
+            photos.append(
+                PhotoType(
+                    url=photo.get_url(info.context),
+                    preview_url=photo.get_preview_url(info.context),
+                    icon_url=photo.get_icon_url(info.context),
+                    longitude=photo.longitude,
+                    latitude=photo.latitude,
+                )
             )
-        return images
+        return photos
 
 
 class CreateTrack(TrackTypeMixin, Mutation):
@@ -112,7 +121,7 @@ class CreateTrack(TrackTypeMixin, Mutation):
         avg_speed_km_per_h = Float()
         uphill_m = Float()
         downhill_m = Float()
-        images = List(Upload)
+        photos = List(Upload)
 
     @staticmethod
     @login_required
@@ -149,15 +158,15 @@ class CreateTrack(TrackTypeMixin, Mutation):
             get_object_or_404(CyclingTour, pk=tour_id, owner=info.context.user)
 
         # create track
-        images = fields.get("images", []) or []
-        if "images" in fields:
-            del fields["images"]
+        photos = fields.get("photos", []) or []
+        if "photos" in fields:
+            del fields["photos"]
 
         # validate images
-        for image in images:
-            if image.content_type not in s.IMAGE_ALLOWED_CONTENT_TYPES:
+        for photo in photos:
+            if photo.content_type not in s.IMAGE_ALLOWED_CONTENT_TYPES:
                 raise GraphQLError(_("Invalid image type"))
-            if image.size > s.IMAGE_MAX_FILESIZE_BYTES:
+            if photo.size > s.IMAGE_MAX_FILESIZE_BYTES:
                 raise GraphQLError(_("Image file size too large"))
 
         track = CyclingTrack(owner=info.context.user, **fields)
@@ -184,9 +193,9 @@ class CreateTrack(TrackTypeMixin, Mutation):
         track.save()
 
         # add images
-        for image in images:
-            TrackImage.objects.create(
-                track=track, file=image,
+        for photo in photos:
+            TrackPhoto.objects.create(
+                track=track, file=photo,
             )
 
 

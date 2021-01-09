@@ -78,15 +78,23 @@ class Track(PolymorphicModel, TimeStampedModel):
             return request.build_absolute_uri(self.geojson.url)
 
 
-class TrackImage(models.Model):
+class TrackPhoto(models.Model):
     track = models.ForeignKey(Track, blank=False, null=False, on_delete=models.CASCADE)
     file = models.ImageField(upload_to=upload_to, blank=False, null=False)
     longitude = models.DecimalField(max_digits=8, decimal_places=5, blank=False, null=True)
     latitude = models.DecimalField(max_digits=8, decimal_places=5, blank=False, null=True)
 
+    def get_url(self, request):
+        return request.build_absolute_uri(self.file.url)
+
     def get_preview_url(self, request):
         thumbnailer = get_thumbnailer(self.file)
         image_url_path = thumbnailer["preview"].url
+        return request.build_absolute_uri(image_url_path)
+
+    def get_icon_url(self, request):
+        thumbnailer = get_thumbnailer(self.file)
+        image_url_path = thumbnailer["icon"].url
         return request.build_absolute_uri(image_url_path)
 
     def save(self, *args, **kwargs):
