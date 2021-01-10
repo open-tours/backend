@@ -103,7 +103,6 @@ class TrackPhoto(models.Model):
         if hasattr(exif_data, "gps_longitude") and hasattr(exif_data, "gps_latitude"):
             self.longitude = degrees_minutes_seconds_to_decimal(*exif_data.gps_longitude)
             self.latitude = degrees_minutes_seconds_to_decimal(*exif_data.gps_latitude)
-
         super().save(*args, **kwargs)
 
 

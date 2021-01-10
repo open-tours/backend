@@ -82,8 +82,25 @@ class CreateUser(Mutation):
         form.save()
 
 
+class UpdateUser(Mutation):
+    id = ID()
+
+    class Arguments:
+        name = String()
+        logbook_title = String()
+
+    @staticmethod
+    @login_required
+    def mutate(self, info, **kwargs):
+        user = info.context.user
+        for field, value in kwargs.items():
+            setattr(user, field, value)
+        user.save()
+
+
 class Mutation(ObjectType):
     user_create = CreateUser.Field()
+    user_update = UpdateUser.Field()
     token_auth = graphql_jwt.ObtainJSONWebToken.Field()
     token_verify = graphql_jwt.Verify.Field()
     token_refresh = graphql_jwt.Refresh.Field()
