@@ -1,5 +1,6 @@
 import graphql_jwt
-from graphene import ID, Field, Int, Mutation, ObjectType, String
+from django.shortcuts import get_object_or_404
+from graphene import ID, Field, Int, List, Mutation, ObjectType, String
 from graphene_django.types import DjangoObjectType
 from graphql import GraphQLError
 from graphql_jwt.decorators import login_required
@@ -14,6 +15,8 @@ class UserPublicType(DjangoObjectType):
         fields = (
             "id",
             "name",
+            "logbook_prefix",
+            "logbook_title",
             "last_login",
             "date_joined",
         )
@@ -26,14 +29,24 @@ class UserPrivateType(DjangoObjectType):
             "id",
             "email",
             "name",
+            "logbook_prefix",
+            "logbook_title",
+            "logbook_header_image",
             "last_login",
             "date_joined",
         )
 
 
+class Logbook(ObjectType):
+    prefix = String()
+    title = String()
+    tracks = List("tours.schema.TrackType")  # avoid circular import
+
+
 class Query:
     user = Field(UserPublicType, id=Int(required=True))
     me = Field(UserPrivateType)
+    logbook = Field(Logbook, prefix=ID(required=True))
 
     @staticmethod
     def resolve_user(self, info, **kwargs):
@@ -43,6 +56,11 @@ class Query:
     @login_required
     def resolve_me(self, info):
         return info.context.user
+
+    @staticmethod
+    def resolve_logbook(self, info, **kwargs):
+        user = get_object_or_404(User, logbook_prefix=kwargs["prefix"])
+        return Logbook(prefix=user.logbook_prefix, title=user.logbook_title, tracks=user.track_set.all())
 
 
 class CreateUser(Mutation):
