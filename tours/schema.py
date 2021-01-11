@@ -164,9 +164,9 @@ class CreateTrack(TrackTypeMixin, Mutation):
 
         # validate images
         for photo in photos:
-            if photo.content_type not in s.IMAGE_ALLOWED_CONTENT_TYPES:
+            if photo.content_type not in s.PHOTO_ALLOWED_CONTENT_TYPES:
                 raise GraphQLError(_("Invalid image type"))
-            if photo.size > s.IMAGE_MAX_FILESIZE_BYTES:
+            if photo.size > s.PHOTO_MAX_FILESIZE_BYTES:
                 raise GraphQLError(_("Image file size too large"))
 
         track = CyclingTrack(owner=info.context.user, **fields)

@@ -4,6 +4,7 @@ import uuid
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
 from django.utils import timezone
+from easy_thumbnails.files import get_thumbnailer
 
 from .managers import UserManager
 
@@ -35,3 +36,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def is_staff(self):
         return self.is_superuser
+
+    def get_profile_image_url(self, request):
+        thumbnailer = get_thumbnailer(self.profile_image)
+        image_url_path = thumbnailer["small"].url
+        return request.build_absolute_uri(image_url_path)
+
+    def get_logbook_header_image_url(self, request):
+        thumbnailer = get_thumbnailer(self.logbook_header_image)
+        image_url_path = thumbnailer["scaled"].url
+        return request.build_absolute_uri(image_url_path)
