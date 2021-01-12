@@ -1,3 +1,5 @@
+import re
+
 import graphql_jwt
 from django.conf import settings as s
 from django.db.models import FileField, ImageField
@@ -28,7 +30,7 @@ class UserPublicType(UserTypeBase, DjangoObjectType):
             "id",
             "name",
             "profile_image",
-            "logbook_prefix",
+            "logbook_subdomain",
             "logbook_title",
             "logbook_header_image",
             "last_login",
@@ -44,7 +46,7 @@ class UserPrivateType(UserTypeBase, DjangoObjectType):
             "email",
             "name",
             "profile_image",
-            "logbook_prefix",
+            "logbook_subdomain",
             "logbook_title",
             "logbook_header_image",
             "last_login",
@@ -53,7 +55,7 @@ class UserPrivateType(UserTypeBase, DjangoObjectType):
 
 
 class Logbook(ObjectType):
-    prefix = String()
+    subdomain = String()
     title = String()
     header_image = Upload()
     tracks = List("tours.schema.TrackType")  # avoid circular import
@@ -62,7 +64,7 @@ class Logbook(ObjectType):
 class Query:
     user = Field(UserPublicType, id=Int(required=True))
     me = Field(UserPrivateType)
-    logbook = Field(Logbook, prefix=ID(required=True))
+    logbook = Field(Logbook, subdomain=ID(required=True))
 
     @staticmethod
     def resolve_user(self, info, **kwargs):
@@ -75,9 +77,9 @@ class Query:
 
     @staticmethod
     def resolve_logbook(self, info, **kwargs):
-        user = get_object_or_404(User, logbook_prefix=kwargs["prefix"])
+        user = get_object_or_404(User, logbook_subdomain=kwargs["subdomain"])
         return Logbook(
-            prefix=user.logbook_prefix,
+            subdomain=user.logbook_subdomain,
             title=user.logbook_title,
             header_image=user.get_logbook_header_image_url(info.context),
             tracks=user.track_set.all(),
@@ -110,6 +112,7 @@ class UpdateUser(Mutation):
         name = String()
         profile_image = Upload()
         logbook_title = String()
+        logbook_subdomain = String()
         logbook_header_image = Upload()
 
     @staticmethod
@@ -125,6 +128,17 @@ class UpdateUser(Mutation):
             if isinstance(model_field, ImageField):
                 if value.content_type not in s.IMAGE_ALLOWED_CONTENT_TYPES:
                     raise GraphQLError(_("Invalid image type"))
+
+            if field == "logbook_subdomain":
+                if value:
+                    value = value.lower()
+                    if not re.match("^[a-z0-9_-]+$", value):
+                        raise GraphQLError(_("A subdomain can only contain characters a-z, 0-9, - and _"))
+                    if value in ["www", "webmail", "mail", "prod", "stage", "test", "example"]:
+                        raise GraphQLError(_("This subdomain is not allowed"))
+                    if User.objects.filter(logbook_subdomain=value).exists():
+                        raise GraphQLError(_("Subdomain already exists"))
+
             setattr(user, field, value)
         user.save()
 

@@ -21,7 +21,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     name = models.CharField(max_length=255)
     date_joined = models.DateTimeField(default=timezone.now)
     profile_image = models.ImageField(upload_to=upload_to, blank=True, null=True)
-    logbook_prefix = models.CharField(max_length=15, blank=True, null=True, unique=True)
+    logbook_subdomain = models.CharField(max_length=25, blank=True, null=True, unique=True)
     logbook_title = models.TextField(max_length=250, blank=True, null=True)
     logbook_header_image = models.ImageField(upload_to=upload_to, blank=True, null=True)
 
