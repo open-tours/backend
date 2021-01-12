@@ -139,7 +139,7 @@ AUTHENTICATION_BACKENDS = [
 
 THUMBNAIL_ALIASES = {
     "users.User.profile_image": {"small": {"size": (128, 96), "crop": False, "upscale": True},},
-    "users.User.logbook_header_image": {"scaled": {"size": (1024, 768), "crop": False, "upscale": True},},
+    "users.User.logbook_header_image": {"scaled": {"size": (2028, 1024), "crop": False, "upscale": True},},
     "tours.TrackPhoto.file": {
         "icon": {"size": (64, 48), "crop": False, "upscale": True},
         "preview": {"size": (1920, 1440), "crop": False, "upscale": True},

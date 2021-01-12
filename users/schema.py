@@ -13,7 +13,15 @@ from .forms import EmailUserCreationForm
 from .models import User
 
 
-class UserPublicType(DjangoObjectType):
+class UserTypeBase:
+    def resolve_profile_image(self, info):
+        return self.get_profile_image_url(info.context)
+
+    def resolve_logbook_header_image(self, info):
+        return self.get_logbook_header_image_url(info.context)
+
+
+class UserPublicType(UserTypeBase, DjangoObjectType):
     class Meta:
         model = User
         fields = (
@@ -27,11 +35,8 @@ class UserPublicType(DjangoObjectType):
             "date_joined",
         )
 
-    def resolve_profile_image(self, info):
-        return self.get_profile_image_url(info.context)
 
-
-class UserPrivateType(DjangoObjectType):
+class UserPrivateType(UserTypeBase, DjangoObjectType):
     class Meta:
         model = User
         fields = (

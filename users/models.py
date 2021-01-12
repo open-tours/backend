@@ -38,11 +38,15 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.is_superuser
 
     def get_profile_image_url(self, request):
+        if not self.profile_image:
+            return
         thumbnailer = get_thumbnailer(self.profile_image)
         image_url_path = thumbnailer["small"].url
         return request.build_absolute_uri(image_url_path)
 
     def get_logbook_header_image_url(self, request):
+        if not self.logbook_header_image:
+            return
         thumbnailer = get_thumbnailer(self.logbook_header_image)
         image_url_path = thumbnailer["scaled"].url
         return request.build_absolute_uri(image_url_path)
