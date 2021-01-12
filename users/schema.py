@@ -136,7 +136,7 @@ class UpdateUser(Mutation):
                         raise GraphQLError(_("A subdomain can only contain characters a-z, 0-9, - and _"))
                     if value in ["www", "webmail", "mail", "prod", "stage", "test", "example"]:
                         raise GraphQLError(_("This subdomain is not allowed"))
-                    if User.objects.filter(logbook_subdomain=value).exists():
+                    if User.objects.filter(logbook_subdomain=value).exclude(id=user.id).exists():
                         raise GraphQLError(_("Subdomain already exists"))
 
             setattr(user, field, value)
